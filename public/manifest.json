@@ -1,0 +1,24 @@
+{
+  "name": "Messenger Lite",
+  "short_name": "MsgLite",
+  "description": "Ứng dụng nhắn tin và gọi điện nhóm nội bộ cực nhanh, bảo mật và mượt mà.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#090d16",
+  "theme_color": "#2563eb",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ]
+}
