@@ -8,6 +8,7 @@ import {
   Search, Plus, Shield, MessageSquare, Mic, Square, Smile, CornerDownLeft, Trash2, X, FolderOpen 
 } from 'lucide-react'
 import CallModal from '@/components/CallModal'
+import Link from 'next/link'
 
 interface Profile {
   id: string
@@ -201,6 +202,83 @@ export default function ChatPage() {
       supabase.removeChannel(presenceChannel)
     }
   }, [currentUser, callState.status, supabase])
+
+  // Ghi âm tin nhắn thoại (MediaRecorder API - Safari & Chrome Optimized)
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' })
+      const chunks: Blob[] = []
+      
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data)
+      }
+      
+      recorder.onstop = async () => {
+        const audioBlob = new Blob(chunks, { type: 'audio/webm' })
+        const file = new File([audioBlob], `voice_${Date.now()}.webm`, { type: 'audio/webm' })
+        
+        // Tải lên Supabase Storage và gửi tin nhắn
+        await handleFileUpload(file)
+        
+        // Dừng tất cả track để giải phóng phần cứng ngay lập tức
+        stream.getTracks().forEach(track => track.stop())
+      }
+      
+      recorder.start()
+      setMediaRecorder(recorder)
+      setIsRecording(true)
+    } catch (err) {
+      console.error('Không thể truy cập microphone:', err)
+      alert('Vui lòng cấp quyền truy cập Micro để ghi âm tin nhắn thoại!')
+    }
+  }
+
+  const stopRecording = () => {
+    if (mediaRecorder && isRecording) {
+      mediaRecorder.stop()
+      setIsRecording(false)
+    }
+  }
+
+  // Tải file lên Supabase Storage (Hình ảnh/Audio)
+  const handleFileUpload = async (file: File) => {
+    if (!activeRoom || !currentUser) return
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
+      const filePath = `${activeRoom.id}/${fileName}`
+
+      const { data, error } = await supabase.storage
+        .from('chat-media')
+        .upload(filePath, file)
+
+      if (error) {
+        if (error.message.includes('Bucket not found')) {
+          alert('Lỗi: Bạn cần tạo một bucket tên là "chat-media" ở mục Storage trên Supabase Dashboard trước!')
+        } else {
+          throw error
+        }
+        return
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('chat-media')
+        .getPublicUrl(filePath)
+
+      // Gửi tin nhắn chứa file đính kèm
+      await supabase.from('messages').insert({
+        room_id: activeRoom.id,
+        sender_id: currentUser.id,
+        content: file.type.startsWith('audio/') ? '[Tin nhắn thoại]' : `[Hình ảnh]`,
+        file_url: publicUrl,
+        parent_id: replyingMessage?.id || null
+      })
+      setReplyingMessage(null)
+    } catch (e) {
+      console.error('Lỗi upload file:', e)
+    }
+  }
 
   // Cuộn xuống tin nhắn cuối cùng
   const scrollToBottom = () => {
